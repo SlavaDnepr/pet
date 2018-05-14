@@ -3,9 +3,15 @@ using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Linq;
 using System.Net;
+using System.Net.Mail;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
+using Com.CloudRail.SI;
+using Com.CloudRail.SI.ServiceCode.Commands.CodeRedirect;
+using Com.CloudRail.SI.Services;
 using HtmlAgilityPack;
+using WatiN.Core;
 
 namespace Monitoring
 {
@@ -27,6 +33,16 @@ namespace Monitoring
                     {
                         Title = "Ротарикс Социальная аптека",
                         Url = "https://1sa.com.ua/rotariks-susp-d-peror-pr-1-5-ml-1-aplikator-1.html"
+                    },
+                    new MonitoringJob
+                    {
+                        Title = "Инфанрикс Гекса Aптека 24",
+                        Url = "https://www.apteka24.ua/infanriks-geksa-fl-1d-n1-shprits-2igla/"
+                    },
+                    new MonitoringJob
+                    {
+                        Title = "Ротарикс Aптека 24",
+                        Url = "https://www.apteka24.ua/rotariks-n1/"
                     }
                 };
         }
@@ -35,12 +51,21 @@ namespace Monitoring
         {
             foreach (var monitoringJob in jobs)
             {
-                //var result = DownloadViaWebClient(monitoringJob);
-                var result = DownloadViaAgilityPack(monitoringJob);
-                if (!string.IsNullOrEmpty(monitoringJob.LastResult) && monitoringJob.LastResult != result)
+                var result = string.Empty;
+                var thread = new Thread(() => 
                 {
+                    Settings.Instance.MakeNewIeInstanceVisible = false;
+                    var ie = new IE(monitoringJob.Url) { Visible = false };
+                    ie.WaitForComplete();
+                    result = ie.Html;
+                    ie.Close();
+                });
+                thread.SetApartmentState(ApartmentState.STA);
+                thread.Start();
+                thread.Join();
+
+                if (!string.IsNullOrEmpty(result) && !string.IsNullOrEmpty(monitoringJob.LastResult) && monitoringJob.LastResult != result)
                     SendNotification(monitoringJob);
-                }
             }
         }
 
@@ -56,6 +81,30 @@ namespace Monitoring
 
         private void SendNotification(MonitoringJob monitoringJob)
         {
+            //// https://cloudrail.com/apps/5af98a878de7127c203f08f0
+            //CloudRail.AppKey = "Monitoring";
+            //var viber = new Viber(null, "", "", "");
+            //viber.SendMessage("+380989897825", monitoringJob.Title);
+
+            
+            var client = 
+                new SmtpClient
+                {
+                    Port = 587,
+                    DeliveryMethod = SmtpDeliveryMethod.Network,
+                    UseDefaultCredentials = false,
+                    Credentials = new NetworkCredential("slavikmaliy@gmail.com", "krasota."),
+                    Host = "smtp.gmail.com",
+                    EnableSsl = true
+                };
+            var mail = 
+                new MailMessage("slavikmaliy@gmail.com>", "maliy_sl@ua.fm")
+                {
+                    Subject = "Что то поменялось",
+                    Body = monitoringJob.Title + "\n" + monitoringJob.Url
+                };
+
+            client.Send(mail);
         }
 
         private static string DownloadViaWebClient(MonitoringJob monitoringJob)

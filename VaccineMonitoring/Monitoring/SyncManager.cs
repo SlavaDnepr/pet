@@ -14,8 +14,7 @@ namespace Monitoring
     {
         private readonly Timer timer = new Timer();
 
-        //private readonly int normalUpdateInterval = 3600 * 1000; // 1 hour
-        private readonly int normalUpdateInterval = 60 * 1000; // 1 hour
+        private readonly int normalUpdateInterval = 1800 * 1000; // 30 min
 
         private readonly int retryUpdateInterval = 300 * 1000; // 5 min 
 

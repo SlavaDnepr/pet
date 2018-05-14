@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Monitoring
 {
-    class MonitoringJob
+    public class MonitoringJob
     {
         public string Url { get; set; }
 
