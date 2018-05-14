@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Linq;
 using System.Net;
 using System.Text;
@@ -33,10 +34,63 @@ namespace Monitoring
         {
             foreach (var monitoringJob in jobs)
             {
-                using (var client = new WebClient())
+                var result = DownloadViaWebClient(monitoringJob);
+                if (monitoringJob.LastResult != result)
                 {
-                    var htmlCode = client.DownloadString(monitoringJob.Url);
+                    SendNotification(monitoringJob);
                 }
+            }
+        }
+
+        private void SendNotification(MonitoringJob monitoringJob)
+        {
+        }
+
+        private static string DownloadViaWebClient(MonitoringJob monitoringJob)
+        {
+            using (var client = new WebClient())
+            {
+                var htmlCode = client.DownloadData(monitoringJob.Url);
+                var encoding = GetEncodingFrom(client.ResponseHeaders, Encoding.UTF8);
+                return encoding.GetString(htmlCode);
+            }
+        }
+
+        public static Encoding GetEncodingFrom(NameValueCollection responseHeaders, Encoding defaultEncoding = null)
+        {
+            if (responseHeaders == null)
+                throw new ArgumentNullException("responseHeaders");
+
+            //Note that key lookup is case-insensitive
+            var contentType = responseHeaders["Content-Type"];
+            if (contentType == null)
+                return defaultEncoding;
+
+            var contentTypeParts = contentType.Split(';');
+            if (contentTypeParts.Length <= 1)
+                return defaultEncoding;
+
+            var charsetPart =
+                contentTypeParts.Skip(1).FirstOrDefault(
+                    p => p.TrimStart().StartsWith("charset", StringComparison.InvariantCultureIgnoreCase));
+            if (charsetPart == null)
+                return defaultEncoding;
+
+            var charsetPartParts = charsetPart.Split('=');
+            if (charsetPartParts.Length != 2)
+                return defaultEncoding;
+
+            var charsetName = charsetPartParts[1].Trim();
+            if (charsetName == "")
+                return defaultEncoding;
+
+            try
+            {
+                return Encoding.GetEncoding(charsetName);
+            }
+            catch (ArgumentException ex)
+            {
+                throw new InvalidOperationException("The server returned data in an unknown encoding: " + charsetName, ex);
             }
         }
     }
