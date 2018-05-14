@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
+using HtmlAgilityPack;
 
 namespace Monitoring
 {
@@ -34,12 +35,23 @@ namespace Monitoring
         {
             foreach (var monitoringJob in jobs)
             {
-                var result = DownloadViaWebClient(monitoringJob);
-                if (monitoringJob.LastResult != result)
+                //var result = DownloadViaWebClient(monitoringJob);
+                var result = DownloadViaAgilityPack(monitoringJob);
+                if (!string.IsNullOrEmpty(monitoringJob.LastResult) && monitoringJob.LastResult != result)
                 {
                     SendNotification(monitoringJob);
                 }
             }
+        }
+
+        private string DownloadViaAgilityPack(MonitoringJob monitoringJob)
+        {
+            var web = new HtmlWeb();
+            var doc = web.Load(monitoringJob.Url);
+            var outerHtml = doc.DocumentNode.OuterHtml;
+            var innerHtml = doc.DocumentNode.InnerHtml;
+
+            return innerHtml;
         }
 
         private void SendNotification(MonitoringJob monitoringJob)
