@@ -14,9 +14,12 @@ namespace Monitoring
     {
         private readonly Timer timer = new Timer();
 
-        private readonly int normalUpdateInterval = 1800 * 1000; // 30 min
+        private readonly int normalUpdateInterval = 600 * 1000; // 10 min
+        //private readonly int normalUpdateInterval = 60 * 1000; // 1 min
 
         private readonly int retryUpdateInterval = 300 * 1000; // 5 min 
+
+        private readonly MonitoringManager monitoringManager = new MonitoringManager();
 
         private bool IsRetryMode { get; set; }
 
@@ -59,9 +62,7 @@ namespace Monitoring
         private void Sync()
         {
             try
-            {
-                var monitoringManager = new MonitoringManager();
-                
+            {              
                 monitoringManager.Run();
                 
                 IsRetryMode = false;

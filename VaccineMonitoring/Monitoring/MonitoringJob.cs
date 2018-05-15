@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Monitoring
+﻿namespace Monitoring
 {
     public class MonitoringJob
     {
@@ -13,5 +7,7 @@ namespace Monitoring
         public string Title { get; set; }
 
         public string LastResult { get; set; }
+
+        public Warehouse Warehouse { get; set; }
     }
 }

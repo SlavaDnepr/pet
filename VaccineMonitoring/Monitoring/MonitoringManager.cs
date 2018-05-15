@@ -6,10 +6,10 @@ using System.Net;
 using System.Net.Mail;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
-using Com.CloudRail.SI;
-using Com.CloudRail.SI.ServiceCode.Commands.CodeRedirect;
-using Com.CloudRail.SI.Services;
+//using System.Threading.Tasks;
+//using Com.CloudRail.SI;
+//using Com.CloudRail.SI.ServiceCode.Commands.CodeRedirect;
+//using Com.CloudRail.SI.Services;
 using HtmlAgilityPack;
 using WatiN.Core;
 
@@ -21,28 +21,32 @@ namespace Monitoring
 
         public MonitoringManager()
         {
-            jobs = 
+            jobs =
                 new List<MonitoringJob>
                 {
                     new MonitoringJob
                     {
                         Title = "Інфанрикс Гекса Социальная аптека",
-                        Url = "https://1sa.com.ua/infanriks-geksa-susp-d-in-shpric-por-d-in-1-t.html"
+                        Url = "https://1sa.com.ua/infanriks-geksa-susp-d-in-shpric-por-d-in-1-t.html",
+                        Warehouse = Warehouse.SA
                     },
                     new MonitoringJob
                     {
                         Title = "Ротарикс Социальная аптека",
-                        Url = "https://1sa.com.ua/rotariks-susp-d-peror-pr-1-5-ml-1-aplikator-1.html"
+                        Url = "https://1sa.com.ua/rotariks-susp-d-peror-pr-1-5-ml-1-aplikator-1.html",
+                        Warehouse = Warehouse.SA
                     },
                     new MonitoringJob
                     {
                         Title = "Инфанрикс Гекса Aптека 24",
-                        Url = "https://www.apteka24.ua/infanriks-geksa-fl-1d-n1-shprits-2igla/"
+                        Url = "https://www.apteka24.ua/infanriks-geksa-fl-1d-n1-shprits-2igla/",
+                        Warehouse = Warehouse.Apteka24
                     },
                     new MonitoringJob
                     {
                         Title = "Ротарикс Aптека 24",
-                        Url = "https://www.apteka24.ua/rotariks-n1/"
+                        Url = "https://www.apteka24.ua/rotariks-n1/",
+                        Warehouse = Warehouse.Apteka24
                     }
                 };
         }
@@ -52,21 +56,75 @@ namespace Monitoring
             foreach (var monitoringJob in jobs)
             {
                 var result = string.Empty;
-                var thread = new Thread(() => 
+                var thread = new Thread(() =>
                 {
                     Settings.Instance.MakeNewIeInstanceVisible = false;
                     var ie = new IE(monitoringJob.Url) { Visible = false };
                     ie.WaitForComplete();
-                    result = ie.Html;
+                    if (monitoringJob.Warehouse == Warehouse.Apteka24)
+                    {
+                        var productcarts = ie.Body.Divs.Where(arg => arg.ClassName == "productcart");
+                        result = productcarts.FirstOrDefault()?.InnerHtml;
+                    }
+                    else
+                        result = ie.Html;
                     ie.Close();
                 });
                 thread.SetApartmentState(ApartmentState.STA);
                 thread.Start();
                 thread.Join();
 
-                if (!string.IsNullOrEmpty(result) && !string.IsNullOrEmpty(monitoringJob.LastResult) && monitoringJob.LastResult != result)
-                    SendNotification(monitoringJob);
+                if (!string.IsNullOrEmpty(result))
+                {
+                    result = ModifyResult(monitoringJob, result);
+
+                    if (!string.IsNullOrEmpty(monitoringJob.LastResult) && monitoringJob.LastResult != result)
+                        SendNotification(monitoringJob);
+
+                    monitoringJob.LastResult = result;
+                }
+
             }
+        }
+
+        private static string ModifyResult(MonitoringJob monitoringJob, string result)
+        {
+            if (monitoringJob.Warehouse == Warehouse.SA)
+            {
+                for (var i = 0; i < 3; i++)
+                {
+                    var startIndex = result.IndexOf("cdz-nav-tab");
+                    if (startIndex != -1)
+                        result = result.Remove(startIndex, 14);
+                }
+            }
+
+            if (monitoringJob.Warehouse == Warehouse.Apteka24)
+            {
+
+                for (var i = 0; i < 3; i++)
+                {
+                    var startIndex = result.IndexOf("SERVER_TIME");
+                    if (startIndex != -1)
+                        result = result.Remove(startIndex, 26);
+                }
+
+                for (var i = 0; i < 3; i++)
+                {
+                    var startIndex = result.IndexOf("href=\"#rot");
+                    if (startIndex != -1)
+                        result = result.Remove(startIndex, 25);
+                }
+
+                for (var i = 0; i < 3; i++)
+                {
+                    var startIndex = result.IndexOf("id=\"rot");
+                    if (startIndex != -1)
+                        result = result.Remove(startIndex, 22);
+                }
+            }
+
+            return result;
         }
 
         private string DownloadViaAgilityPack(MonitoringJob monitoringJob)
@@ -81,13 +139,7 @@ namespace Monitoring
 
         private void SendNotification(MonitoringJob monitoringJob)
         {
-            //// https://cloudrail.com/apps/5af98a878de7127c203f08f0
-            //CloudRail.AppKey = "Monitoring";
-            //var viber = new Viber(null, "", "", "");
-            //viber.SendMessage("+380989897825", monitoringJob.Title);
-
-            
-            var client = 
+            var client =
                 new SmtpClient
                 {
                     Port = 587,
@@ -97,10 +149,10 @@ namespace Monitoring
                     Host = "smtp.gmail.com",
                     EnableSsl = true
                 };
-            var mail = 
+            var mail =
                 new MailMessage("slavikmaliy@gmail.com>", "maliy_sl@ua.fm")
                 {
-                    Subject = "Что то поменялось",
+                    Subject = monitoringJob.Title,
                     Body = monitoringJob.Title + "\n" + monitoringJob.Url
                 };
 
