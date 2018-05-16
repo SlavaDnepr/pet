@@ -10,8 +10,8 @@ namespace VaccineMonitoring.Console
     {
         private readonly Timer timer = new Timer();
 
-        //private readonly int normalUpdateInterval = 600 * 1000; // 10 min
-        private readonly int normalUpdateInterval = 60 * 1000; // 1 min
+        private readonly int normalUpdateInterval = 600 * 1000; // 10 min
+        //private readonly int normalUpdateInterval = 60 * 1000; // 1 min
 
         private readonly int retryUpdateInterval = 300 * 1000; // 5 min 
 

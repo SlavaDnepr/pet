@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Mail;
 using System.Threading;
+using HtmlAgilityPack;
 using log4net;
 using WatiN.Core;
 
@@ -24,24 +25,24 @@ namespace VaccineMonitoring.Console
                         Url = "https://1sa.com.ua/infanriks-geksa-susp-d-in-shpric-por-d-in-1-t.html",
                         Warehouse = Warehouse.SA
                     },
-                    //new MonitoringJob
-                    //{
-                    //    Title = "Rotarix 1SA",
-                    //    Url = "https://1sa.com.ua/rotariks-susp-d-peror-pr-1-5-ml-1-aplikator-1.html",
-                    //    Warehouse = Warehouse.SA
-                    //},
-                    //new MonitoringJob
-                    //{
-                    //    Title = "Infanrix Gexa Apteka24",
-                    //    Url = "https://www.apteka24.ua/infanriks-geksa-fl-1d-n1-shprits-2igla/",
-                    //    Warehouse = Warehouse.Apteka24
-                    //},
-                    //new MonitoringJob
-                    //{
-                    //    Title = "Rotarix Apteka24",
-                    //    Url = "https://www.apteka24.ua/rotariks-n1/",
-                    //    Warehouse = Warehouse.Apteka24
-                    //}
+                    new MonitoringJob
+                    {
+                        Title = "Rotarix 1SA",
+                        Url = "https://1sa.com.ua/rotariks-susp-d-peror-pr-1-5-ml-1-aplikator-1.html",
+                        Warehouse = Warehouse.SA
+                    },
+                    new MonitoringJob
+                    {
+                        Title = "Infanrix Gexa Apteka24",
+                        Url = "https://www.apteka24.ua/infanriks-geksa-fl-1d-n1-shprits-2igla/",
+                        Warehouse = Warehouse.Apteka24
+                    },
+                    new MonitoringJob
+                    {
+                        Title = "Rotarix Apteka24",
+                        Url = "https://www.apteka24.ua/rotariks-n1/",
+                        Warehouse = Warehouse.Apteka24
+                    }
                 };
         }
 
@@ -121,12 +122,18 @@ namespace VaccineMonitoring.Console
         {
             if (monitoringJob.Warehouse == Warehouse.SA)
             {
-                for (var i = 0; i < 3; i++)
-                {
-                    var startIndex = result.IndexOf("cdz-nav-tab");
-                    if (startIndex != -1)
-                        result = result.Remove(startIndex, 14);
-                }
+                var doc = new HtmlDocument();
+                doc.LoadHtml(result);
+                var specificNode = doc.DocumentNode.SelectSingleNode("//div[contains(@class, 'product-info-tabs')]");
+                specificNode.Remove();
+                result = doc.DocumentNode.InnerHtml;
+
+                //for (var i = 0; i < 3; i++)
+                //{
+                //    var startIndex = result.IndexOf("cdz-nav-tab");
+                //    if (startIndex != -1)
+                //        result = result.Remove(startIndex, 14);
+                //}
             }
 
             if (monitoringJob.Warehouse == Warehouse.Apteka24)
