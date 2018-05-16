@@ -1,12 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Configuration;
-using System.IO;
-using System.Linq;
 using System.Net;
 using System.Text;
-using System.Threading.Tasks;
 using System.Timers;
+using log4net;
 
 namespace Monitoring
 {
@@ -33,13 +29,14 @@ namespace Monitoring
         public void Start()
         {
             timer.Start();
-            //Logger.Info(logType, Resources.Resources.SOFTWARE_REPOSITORY_STARTED_MESSAGE);
+            Sync();
+            LogManager.GetLogger("MonitoringLogger").Info("SyncManager Start");
         }
 
         public void Stop()
         {
             timer.Stop();
-            //Logger.Info(logType, Resources.Resources.SOFTWARE_REPOSITORY_STOPPED_MESSAGE);
+            LogManager.GetLogger("MonitoringLogger").Info("SyncManager Stop");
         }
 
         private void OnTimerEvent(object sender, ElapsedEventArgs e)
@@ -61,6 +58,7 @@ namespace Monitoring
 
         private void Sync()
         {
+            LogManager.GetLogger("MonitoringLogger").Info("Updating");
             try
             {              
                 monitoringManager.Run();
@@ -71,27 +69,26 @@ namespace Monitoring
             {
                 IsRetryMode = true;
 
-                //if (exception.Response != null)
-                //{
-                //    using (Stream responseStream = exception.Response.GetResponseStream())
-                //    {
-                //        if (responseStream != null)
-                //        {
-                //            byte[] bytes = new byte[responseStream.Length];
-                //            responseStream.Read(bytes, 0, bytes.Length);
-                //            string message = string.Concat(Resources.Resources.SOFTWARE_REPOSITORY_ERROR_RESPONSE_MESSAGE, Environment.NewLine, RemoveTags(Encoding.UTF8.GetString(bytes)));
-                //            Logger.Error(logType, message);
-                //        }
-                //    }
-                //}
+                if (exception.Response != null)
+                {
+                    using (var responseStream = exception.Response.GetResponseStream())
+                    {
+                        if (responseStream != null)
+                        {
+                            byte[] bytes = new byte[responseStream.Length];
+                            responseStream.Read(bytes, 0, bytes.Length);
+                            LogManager.GetLogger("MonitoringLogger").Error(Encoding.UTF8.GetString(bytes));
+                        }
+                    }
+                }
             }
             catch (Exception exception)
             {
                 IsRetryMode = true;
-                //Logger.Error(exception.Message, exception);
+                LogManager.GetLogger("MonitoringLogger").Error(exception.Message, exception);
             }
 
-            //Logger.Info(logType, Resources.Resources.SOFTWARE_REPOSITORY_UPDATED_MESSAGE);
+            LogManager.GetLogger("MonitoringLogger").Info("Updated");          
         }
     }
 }

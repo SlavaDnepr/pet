@@ -11,6 +11,7 @@ using System.Threading;
 //using Com.CloudRail.SI.ServiceCode.Commands.CodeRedirect;
 //using Com.CloudRail.SI.Services;
 using HtmlAgilityPack;
+using log4net;
 using WatiN.Core;
 
 namespace Monitoring
@@ -26,25 +27,25 @@ namespace Monitoring
                 {
                     new MonitoringJob
                     {
-                        Title = "Інфанрикс Гекса Социальная аптека",
+                        Title = "Infanrix Gexa 1SA",
                         Url = "https://1sa.com.ua/infanriks-geksa-susp-d-in-shpric-por-d-in-1-t.html",
                         Warehouse = Warehouse.SA
                     },
                     new MonitoringJob
                     {
-                        Title = "Ротарикс Социальная аптека",
+                        Title = "Rotarix 1SA",
                         Url = "https://1sa.com.ua/rotariks-susp-d-peror-pr-1-5-ml-1-aplikator-1.html",
                         Warehouse = Warehouse.SA
                     },
                     new MonitoringJob
                     {
-                        Title = "Инфанрикс Гекса Aптека 24",
+                        Title = "Infanrix Gexa Apteka24",
                         Url = "https://www.apteka24.ua/infanriks-geksa-fl-1d-n1-shprits-2igla/",
                         Warehouse = Warehouse.Apteka24
                     },
                     new MonitoringJob
                     {
-                        Title = "Ротарикс Aптека 24",
+                        Title = "Rotarix Apteka24",
                         Url = "https://www.apteka24.ua/rotariks-n1/",
                         Warehouse = Warehouse.Apteka24
                     }
@@ -55,35 +56,56 @@ namespace Monitoring
         {
             foreach (var monitoringJob in jobs)
             {
-                var result = string.Empty;
-                var thread = new Thread(() =>
+                try
                 {
-                    Settings.Instance.MakeNewIeInstanceVisible = false;
-                    var ie = new IE(monitoringJob.Url) { Visible = false };
-                    ie.WaitForComplete();
-                    if (monitoringJob.Warehouse == Warehouse.Apteka24)
+
+                    var result = string.Empty;
+                    var thread = new Thread(
+                        () =>
+                        {
+                            try
+                            {
+                                Settings.Instance.MakeNewIeInstanceVisible = false;
+                                var ie = new IE(monitoringJob.Url) { Visible = false };
+                                ie.WaitForComplete();
+                                if (monitoringJob.Warehouse == Warehouse.Apteka24)
+                                {
+                                    var productcarts = ie.Body.Divs.Where(arg => arg.ClassName == "productcart");
+                                    result = productcarts.FirstOrDefault()?.InnerHtml;
+                                }
+                                else
+                                    result = ie.Html;
+                                ie.Close();
+                            }
+                            catch (Exception exception)
+                            {
+                                LogManager.GetLogger("MonitoringLogger").Error("Error during ie emulation" + monitoringJob.Title, exception);
+                            }
+                        });
+                    thread.SetApartmentState(ApartmentState.STA);
+                    thread.Start();
+                    thread.Join();
+
+                    if (!string.IsNullOrEmpty(result))
                     {
-                        var productcarts = ie.Body.Divs.Where(arg => arg.ClassName == "productcart");
-                        result = productcarts.FirstOrDefault()?.InnerHtml;
+                        result = ModifyResult(monitoringJob, result);
+
+                        if (!string.IsNullOrEmpty(monitoringJob.LastResult) && monitoringJob.LastResult != result)
+                        {
+                            LogManager.GetLogger("MonitoringLogger").Info("Result was changed for " + monitoringJob.Title);
+                            LogManager.GetLogger("MonitoringLogger").Info("Notification will be sent");
+                            SendNotification(monitoringJob);
+                        }
+                        else
+                            LogManager.GetLogger("MonitoringLogger").Info("Nothing was changed for " + monitoringJob.Title);
+
+                        monitoringJob.LastResult = result;
                     }
-                    else
-                        result = ie.Html;
-                    ie.Close();
-                });
-                thread.SetApartmentState(ApartmentState.STA);
-                thread.Start();
-                thread.Join();
-
-                if (!string.IsNullOrEmpty(result))
-                {
-                    result = ModifyResult(monitoringJob, result);
-
-                    if (!string.IsNullOrEmpty(monitoringJob.LastResult) && monitoringJob.LastResult != result)
-                        SendNotification(monitoringJob);
-
-                    monitoringJob.LastResult = result;
                 }
-
+                catch (Exception exception)
+                {
+                    LogManager.GetLogger("MonitoringLogger").Error("Error during update" + monitoringJob.Title, exception);
+                }
             }
         }
 
@@ -101,7 +123,6 @@ namespace Monitoring
 
             if (monitoringJob.Warehouse == Warehouse.Apteka24)
             {
-
                 for (var i = 0; i < 3; i++)
                 {
                     var startIndex = result.IndexOf("SERVER_TIME");
@@ -139,24 +160,32 @@ namespace Monitoring
 
         private void SendNotification(MonitoringJob monitoringJob)
         {
-            var client =
-                new SmtpClient
-                {
-                    Port = 587,
-                    DeliveryMethod = SmtpDeliveryMethod.Network,
-                    UseDefaultCredentials = false,
-                    Credentials = new NetworkCredential("slavikmaliy@gmail.com", "krasota."),
-                    Host = "smtp.gmail.com",
-                    EnableSsl = true
-                };
-            var mail =
-                new MailMessage("slavikmaliy@gmail.com>", "maliy_sl@ua.fm")
-                {
-                    Subject = monitoringJob.Title,
-                    Body = monitoringJob.Title + "\n" + monitoringJob.Url
-                };
+            try
+            {
+                var client =
+                    new SmtpClient
+                    {
+                        Port = 587,
+                        DeliveryMethod = SmtpDeliveryMethod.Network,
+                        UseDefaultCredentials = false,
+                        Credentials = new NetworkCredential("slavikmaliy@gmail.com", "krasota."),
+                        Host = "smtp.gmail.com",
+                        EnableSsl = true
+                    };
+                var mail =
+                    new MailMessage("slavikmaliy@gmail.com>", "maliy_sl@ua.fm")
+                    {
+                        Subject = monitoringJob.Title,
+                        Body = monitoringJob.Title + "\n" + monitoringJob.Url
+                    };
 
-            client.Send(mail);
+                client.Send(mail);
+                LogManager.GetLogger("MonitoringLogger").Info("Notification was sent for " + monitoringJob.Title);
+            }
+            catch (Exception exception)
+            {
+                LogManager.GetLogger("MonitoringLogger").Error("Error during notification" + monitoringJob.Title, exception);
+            }
         }
 
         private static string DownloadViaWebClient(MonitoringJob monitoringJob)

@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using log4net;
 using Microsoft.Owin;
 using Monitoring;
 using Owin;
@@ -15,6 +13,7 @@ namespace VaccineMonitoring
         {
             ConfigureAuth(app);
 
+            LogManager.GetLogger("MonitoringLogger").Info("SyncManager starting...");
             new SyncManager().Start();
         }
     }
