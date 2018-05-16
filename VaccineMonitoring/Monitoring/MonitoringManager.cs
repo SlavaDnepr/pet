@@ -31,24 +31,24 @@ namespace Monitoring
                         Url = "https://1sa.com.ua/infanriks-geksa-susp-d-in-shpric-por-d-in-1-t.html",
                         Warehouse = Warehouse.SA
                     },
-                    new MonitoringJob
-                    {
-                        Title = "Rotarix 1SA",
-                        Url = "https://1sa.com.ua/rotariks-susp-d-peror-pr-1-5-ml-1-aplikator-1.html",
-                        Warehouse = Warehouse.SA
-                    },
-                    new MonitoringJob
-                    {
-                        Title = "Infanrix Gexa Apteka24",
-                        Url = "https://www.apteka24.ua/infanriks-geksa-fl-1d-n1-shprits-2igla/",
-                        Warehouse = Warehouse.Apteka24
-                    },
-                    new MonitoringJob
-                    {
-                        Title = "Rotarix Apteka24",
-                        Url = "https://www.apteka24.ua/rotariks-n1/",
-                        Warehouse = Warehouse.Apteka24
-                    }
+                    //new MonitoringJob
+                    //{
+                    //    Title = "Rotarix 1SA",
+                    //    Url = "https://1sa.com.ua/rotariks-susp-d-peror-pr-1-5-ml-1-aplikator-1.html",
+                    //    Warehouse = Warehouse.SA
+                    //},
+                    //new MonitoringJob
+                    //{
+                    //    Title = "Infanrix Gexa Apteka24",
+                    //    Url = "https://www.apteka24.ua/infanriks-geksa-fl-1d-n1-shprits-2igla/",
+                    //    Warehouse = Warehouse.Apteka24
+                    //},
+                    //new MonitoringJob
+                    //{
+                    //    Title = "Rotarix Apteka24",
+                    //    Url = "https://www.apteka24.ua/rotariks-n1/",
+                    //    Warehouse = Warehouse.Apteka24
+                    //}
                 };
         }
 
@@ -72,8 +72,11 @@ namespace Monitoring
                                 {
                                     var productcarts = ie.Body.Divs.Where(arg => arg.ClassName == "productcart");
                                     result = productcarts.FirstOrDefault()?.InnerHtml;
-                                }
-                                else
+                                } else if (monitoringJob.Warehouse == Warehouse.SA)
+                                {
+                                    var productessentials = ie.Body.Divs.Where(arg => arg.ClassName == "product-essential");
+                                    result = productessentials.FirstOrDefault()?.InnerHtml;
+                                } else
                                     result = ie.Html;
                                 ie.Close();
                             }
@@ -94,6 +97,15 @@ namespace Monitoring
                         {
                             LogManager.GetLogger("MonitoringLogger").Info("Result was changed for " + monitoringJob.Title);
                             LogManager.GetLogger("MonitoringLogger").Info("Notification will be sent");
+                            for (var i = 0; i <= result.Length; i++)
+                            {
+                                if (result[i] != monitoringJob.LastResult[i])
+                                {
+                                    LogManager.GetLogger("MonitoringLogger").Info("Diff " + result[i-1] + result[i] + result[i+1] + result[i+2]);
+                                    LogManager.GetLogger("MonitoringLogger").Info("Diff " + monitoringJob.LastResult[i-1] + monitoringJob.LastResult[i] + monitoringJob.LastResult[i + 1] + monitoringJob.LastResult[i + 2]);
+                                }
+                            }
+
                             SendNotification(monitoringJob);
                         }
                         else
@@ -173,7 +185,7 @@ namespace Monitoring
                         EnableSsl = true
                     };
                 var mail =
-                    new MailMessage("slavikmaliy@gmail.com>", "maliy_sl@ua.fm")
+                    new MailMessage("slavikmaliy@gmail.com", "maliy_sl@ua.fm")
                     {
                         Subject = monitoringJob.Title,
                         Body = monitoringJob.Title + "\n" + monitoringJob.Url
