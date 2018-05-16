@@ -299,6 +299,7 @@ Src/All.sln
 ThirdParty/
 App_Data/
 VaccineMonitoring/packages
+VaccineMonitoring.Console/packages
 # Generated js files
 *.js
 !**/Scripts/JS/*
