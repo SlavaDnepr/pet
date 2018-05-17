@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Mail;
@@ -97,8 +98,13 @@ namespace VaccineMonitoring.Console
                             {
                                 if (result[i] != monitoringJob.LastResult[i])
                                 {
-                                    LogManager.GetLogger("MonitoringLogger").Info("Diff " + result[i - 1].ToString() + result[i].ToString() + result[i + 1].ToString() + result[i + 2].ToString());
-                                    LogManager.GetLogger("MonitoringLogger").Info("Diff " + monitoringJob.LastResult[i - 1].ToString() + monitoringJob.LastResult[i].ToString() + monitoringJob.LastResult[i + 1].ToString() + monitoringJob.LastResult[i + 2].ToString());
+                                    var now = DateTime.Now;
+                                    var resultDiff = result[i - 1].ToString() + result[i].ToString() + result[i + 1].ToString() + result[i + 2].ToString();
+                                    var lastResultDiff = monitoringJob.LastResult[i - 1].ToString() + monitoringJob.LastResult[i].ToString() + monitoringJob.LastResult[i + 1].ToString() + monitoringJob.LastResult[i + 2].ToString();
+                                    File.WriteAllText(@"C:\Temp\VaccineMonitoring\" + now.ToString("yyyyMMddHHmmssfff") + "-result", result);
+                                    File.WriteAllText(@"C:\Temp\VaccineMonitoring\" + now.ToString("yyyyMMddHHmmssfff") + "-lastResult", monitoringJob.LastResult);
+                                    LogManager.GetLogger("MonitoringLogger").Info("Diff " + resultDiff);
+                                    LogManager.GetLogger("MonitoringLogger").Info("Diff " + lastResultDiff);
                                     break;
                                 }
                             }
