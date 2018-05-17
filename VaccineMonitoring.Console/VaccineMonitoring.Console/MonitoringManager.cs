@@ -88,26 +88,13 @@ namespace VaccineMonitoring.Console
 
                     if (!string.IsNullOrEmpty(result))
                     {
-                        result = ModifyResult(monitoringJob, result);
+                        result = ModifyHtml(monitoringJob, result);
 
                         if (!string.IsNullOrEmpty(monitoringJob.LastResult) && monitoringJob.LastResult != result)
                         {
                             LogManager.GetLogger("MonitoringLogger").Info("Result was changed for " + monitoringJob.Title);
                             LogManager.GetLogger("MonitoringLogger").Info("Notification will be sent");
-                            for (var i = 0; i <= result.Length; i++)
-                            {
-                                if (result[i] != monitoringJob.LastResult[i])
-                                {
-                                    var now = DateTime.Now;
-                                    var resultDiff = result[i - 1].ToString() + result[i].ToString() + result[i + 1].ToString() + result[i + 2].ToString();
-                                    var lastResultDiff = monitoringJob.LastResult[i - 1].ToString() + monitoringJob.LastResult[i].ToString() + monitoringJob.LastResult[i + 1].ToString() + monitoringJob.LastResult[i + 2].ToString();
-                                    File.WriteAllText(@"C:\Temp\VaccineMonitoring\" + now.ToString("yyyyMMddHHmmssfff") + "-result", result);
-                                    File.WriteAllText(@"C:\Temp\VaccineMonitoring\" + now.ToString("yyyyMMddHHmmssfff") + "-lastResult", monitoringJob.LastResult);
-                                    LogManager.GetLogger("MonitoringLogger").Info("Diff " + resultDiff);
-                                    LogManager.GetLogger("MonitoringLogger").Info("Diff " + lastResultDiff);
-                                    break;
-                                }
-                            }
+                            SaveDiff(result, monitoringJob);
 
                             SendNotification(monitoringJob);
                         }
@@ -115,6 +102,7 @@ namespace VaccineMonitoring.Console
                             LogManager.GetLogger("MonitoringLogger").Info("Nothing was changed for " + monitoringJob.Title);
 
                         monitoringJob.LastResult = result;
+                        SendTelegramNotification(monitoringJob);
                     }
                 }
                 catch (Exception exception)
@@ -124,15 +112,36 @@ namespace VaccineMonitoring.Console
             }
         }
 
-        private static string ModifyResult(MonitoringJob monitoringJob, string result)
+        private static void SaveDiff(string result, MonitoringJob monitoringJob)
+        {
+            for (var i = 0; i <= result.Length; i++)
+            {
+                if (result[i] != monitoringJob.LastResult[i])
+                {
+                    var now = DateTime.Now;
+                    var resultDiff = result[i - 1].ToString() + result[i].ToString() + result[i + 1].ToString() + result[i + 2].ToString();
+                    var lastResultDiff = monitoringJob.LastResult[i - 1].ToString() + monitoringJob.LastResult[i].ToString() + monitoringJob.LastResult[i + 1].ToString() + monitoringJob.LastResult[i + 2].ToString();
+                    LogManager.GetLogger("MonitoringLogger").Info("Diff " + resultDiff);
+                    LogManager.GetLogger("MonitoringLogger").Info("Diff " + lastResultDiff);
+                    File.WriteAllText(@"C:\Temp\VaccineMonitoring\" + now.ToString("yyyyMMddHHmmssfff") + "-result", result);
+                    File.WriteAllText(@"C:\Temp\VaccineMonitoring\" + now.ToString("yyyyMMddHHmmssfff") + "-lastResult", monitoringJob.LastResult);
+                    break;
+                }
+            }
+        }
+
+        private static string ModifyHtml(MonitoringJob monitoringJob, string result)
         {
             if (monitoringJob.Warehouse == Warehouse.SA)
             {
                 var doc = new HtmlDocument();
                 doc.LoadHtml(result);
-                var specificNode = doc.DocumentNode.SelectSingleNode("//div[contains(@class, 'product-info-tabs')]");
-                specificNode.Remove();
-                result = doc.DocumentNode.InnerHtml;
+                var productInfoTabNode = doc.DocumentNode.SelectSingleNode("//div[contains(@class, 'product-info-tabs')]");
+                productInfoTabNode?.Remove();
+                var formKeyNode = doc.DocumentNode.SelectSingleNode("//input[@type=\"hidden\" and @name=\"form_key\"]/@value");
+                var dynamicValueToRemove = formKeyNode.Attributes[2].Value;
+
+                result = doc.DocumentNode.InnerHtml.Replace(dynamicValueToRemove, string.Empty);
 
                 //for (var i = 0; i < 3; i++)
                 //{
@@ -170,6 +179,27 @@ namespace VaccineMonitoring.Console
         }
 
         private void SendNotification(MonitoringJob monitoringJob)
+        {
+            SendEmailNotification(monitoringJob);
+            SendTelegramNotification(monitoringJob);
+        }
+
+        private void SendTelegramNotification(MonitoringJob monitoringJob)
+        {
+            try
+            {
+                var botToken = "526101740:AAGDH_XEI-2H5uRDe2hDyS_Jea9W1fThAJk";
+                var bot = new Telegram.Bot.TelegramBotClient(botToken);
+                var chatId = "395421232";
+                bot.SendTextMessageAsync(chatId, monitoringJob.Url);
+            }
+            catch (Exception exception)
+            {
+                LogManager.GetLogger("MonitoringLogger").Error("Error during notification" + monitoringJob.Title, exception);
+            }
+        }
+
+        private static void SendEmailNotification(MonitoringJob monitoringJob)
         {
             try
             {
