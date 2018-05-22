@@ -1,0 +1,2 @@
+sc stop VaccineMonitoring
+sc delete VaccineMonitoring

@@ -65,13 +65,13 @@ namespace VaccineMonitoring.Console
                                 ie.WaitForComplete();
                                 if (monitoringJob.Warehouse == Warehouse.Apteka24)
                                 {
-                                    var productcarts = ie.Body.Divs.Where(arg => arg.ClassName == "productcart");
-                                    result = productcarts.FirstOrDefault()?.InnerHtml;
+                                    var productcartsEnumerable = ie.Body.Divs.Where(arg => arg.ClassName == "productcart");
+                                    result = productcartsEnumerable.FirstOrDefault()?.InnerHtml;
                                 }
                                 else if (monitoringJob.Warehouse == Warehouse.SA)
                                 {
-                                    var productessentials = ie.Body.Divs.Where(arg => arg.ClassName == "product-essential");
-                                    result = productessentials.FirstOrDefault()?.InnerHtml;
+                                    var productessentialsEnumerable = ie.Body.Divs.Where(arg => arg.ClassName == "product-essential");
+                                    result = productessentialsEnumerable.FirstOrDefault()?.InnerHtml;
                                 }
                                 else
                                     result = ie.Html;
@@ -94,15 +94,18 @@ namespace VaccineMonitoring.Console
                         {
                             LogManager.GetLogger("MonitoringLogger").Info("Result was changed for " + monitoringJob.Title);
                             LogManager.GetLogger("MonitoringLogger").Info("Notification will be sent");
-                            SaveDiff(result, monitoringJob);
+                            var diff = ResolveDiff(result, monitoringJob);
 
-                            SendNotification(monitoringJob);
+                            var now = DateTime.Now;
+                            File.WriteAllText(@"C:\Temp\VaccineMonitoring\" + now.ToString("yyyyMMddHHmmssfff") + "-result", result);
+                            File.WriteAllText(@"C:\Temp\VaccineMonitoring\" + now.ToString("yyyyMMddHHmmssfff") + "-lastResult", monitoringJob.LastResult);
+
+                            SendNotification(monitoringJob, diff);
                         }
                         else
                             LogManager.GetLogger("MonitoringLogger").Info("Nothing was changed for " + monitoringJob.Title);
 
                         monitoringJob.LastResult = result;
-                        SendTelegramNotification(monitoringJob);
                     }
                 }
                 catch (Exception exception)
@@ -112,86 +115,99 @@ namespace VaccineMonitoring.Console
             }
         }
 
-        private static void SaveDiff(string result, MonitoringJob monitoringJob)
+        private static Tuple<string, string> ResolveDiff(string result, MonitoringJob monitoringJob)
         {
             for (var i = 0; i <= result.Length; i++)
             {
                 if (result[i] != monitoringJob.LastResult[i])
                 {
-                    var now = DateTime.Now;
                     var resultDiff = result[i - 1].ToString() + result[i].ToString() + result[i + 1].ToString() + result[i + 2].ToString();
                     var lastResultDiff = monitoringJob.LastResult[i - 1].ToString() + monitoringJob.LastResult[i].ToString() + monitoringJob.LastResult[i + 1].ToString() + monitoringJob.LastResult[i + 2].ToString();
                     LogManager.GetLogger("MonitoringLogger").Info("Diff " + resultDiff);
                     LogManager.GetLogger("MonitoringLogger").Info("Diff " + lastResultDiff);
-                    File.WriteAllText(@"C:\Temp\VaccineMonitoring\" + now.ToString("yyyyMMddHHmmssfff") + "-result", result);
-                    File.WriteAllText(@"C:\Temp\VaccineMonitoring\" + now.ToString("yyyyMMddHHmmssfff") + "-lastResult", monitoringJob.LastResult);
-                    break;
+
+                    return new Tuple<string, string>(lastResultDiff, resultDiff);
                 }
             }
+
+            return null;
         }
 
         private static string ModifyHtml(MonitoringJob monitoringJob, string result)
         {
             if (monitoringJob.Warehouse == Warehouse.SA)
-            {
-                var doc = new HtmlDocument();
-                doc.LoadHtml(result);
-                var productInfoTabNode = doc.DocumentNode.SelectSingleNode("//div[contains(@class, 'product-info-tabs')]");
-                productInfoTabNode?.Remove();
-                var formKeyNode = doc.DocumentNode.SelectSingleNode("//input[@type=\"hidden\" and @name=\"form_key\"]/@value");
-                var dynamicValueToRemove = formKeyNode.Attributes[2].Value;
-
-                result = doc.DocumentNode.InnerHtml.Replace(dynamicValueToRemove, string.Empty);
-
-                //for (var i = 0; i < 3; i++)
-                //{
-                //    var startIndex = result.IndexOf("cdz-nav-tab");
-                //    if (startIndex != -1)
-                //        result = result.Remove(startIndex, 14);
-                //}
-            }
+                result = ModifySAResult(result);
 
             if (monitoringJob.Warehouse == Warehouse.Apteka24)
+                result = ModifyApteka24Result(result);
+
+            return result;
+        }
+
+        private static string ModifyApteka24Result(string result)
+        {
+            for (var i = 0; i < 3; i++)
             {
-                for (var i = 0; i < 3; i++)
-                {
-                    var startIndex = result.IndexOf("SERVER_TIME");
-                    if (startIndex != -1)
-                        result = result.Remove(startIndex, 26);
-                }
+                var startIndex = result.IndexOf("SERVER_TIME");
+                if (startIndex != -1)
+                    result = result.Remove(startIndex, 26);
+            }
 
-                for (var i = 0; i < 3; i++)
-                {
-                    var startIndex = result.IndexOf("href=\"#rot");
-                    if (startIndex != -1)
-                        result = result.Remove(startIndex, 25);
-                }
+            for (var i = 0; i < 3; i++)
+            {
+                var startIndex = result.IndexOf("href=\"#rot");
+                if (startIndex != -1)
+                    result = result.Remove(startIndex, 25);
+            }
 
-                for (var i = 0; i < 3; i++)
-                {
-                    var startIndex = result.IndexOf("id=\"rot");
-                    if (startIndex != -1)
-                        result = result.Remove(startIndex, 22);
-                }
+            for (var i = 0; i < 3; i++)
+            {
+                var startIndex = result.IndexOf("id=\"rot");
+                if (startIndex != -1)
+                    result = result.Remove(startIndex, 22);
             }
 
             return result;
         }
 
-        private void SendNotification(MonitoringJob monitoringJob)
+        private static string ModifySAResult(string result)
         {
-            SendEmailNotification(monitoringJob);
-            SendTelegramNotification(monitoringJob);
+            var doc = new HtmlDocument();
+            doc.LoadHtml(result);
+            var productInfoTabNode = doc.DocumentNode.SelectSingleNode("//div[contains(@class, 'product-info-tabs')]");
+            productInfoTabNode?.Remove();
+            var mapNode = doc.DocumentNode.SelectSingleNode("//div[@id='map']");
+            mapNode?.Remove();
+            var formKeyNode = doc.DocumentNode.SelectSingleNode("//input[@type=\"hidden\" and @name=\"form_key\"]/@value");
+            var dynamicValueToRemove = formKeyNode.Attributes[2].Value;
+
+            result = doc.DocumentNode.InnerHtml.Replace(dynamicValueToRemove, string.Empty);
+
+            result = result.Replace("0px", string.Empty).Replace("256px", string.Empty);
+
+            //for (var i = 0; i < 3; i++)
+            //{
+            //    var startIndex = result.IndexOf("cdz-nav-tab");
+            //    if (startIndex != -1)
+            //        result = result.Remove(startIndex, 14);
+            //}
+            return result;
         }
 
-        private void SendTelegramNotification(MonitoringJob monitoringJob)
+        private void SendNotification(MonitoringJob monitoringJob, Tuple<string, string> diff)
+        {
+            // SendEmailNotification(monitoringJob);
+            SendTelegramNotification(monitoringJob, diff);
+        }
+
+        private void SendTelegramNotification(MonitoringJob monitoringJob, Tuple<string, string> diff)
         {
             try
             {
                 var botToken = "526101740:AAGDH_XEI-2H5uRDe2hDyS_Jea9W1fThAJk";
                 var bot = new Telegram.Bot.TelegramBotClient(botToken);
                 var chatId = "395421232";
-                bot.SendTextMessageAsync(chatId, monitoringJob.Url);
+                bot.SendTextMessageAsync(chatId,$"Was= '{diff?.Item1}', now = '{diff?.Item2}' {monitoringJob.Url}");
             }
             catch (Exception exception)
             {

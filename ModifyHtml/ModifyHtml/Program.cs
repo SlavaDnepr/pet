@@ -10,22 +10,20 @@ namespace Cantaloupe.ModifyHtml
     {
         public static void Main()
         {
+
+
+
+            ModifyHtml();
+        }
+
+        private static void SendMessage()
+        {
             CloudRail.AppKey = "5af98a878de7127c203f08f0";
 
             var service = new Com.CloudRail.SI.Services.Telegram(null, "526101740:AAGDH_XEI-2H5uRDe2hDyS_Jea9W1fThAJk", "");
-
-
-            //service.SendMessage("395421232", "test");
-
-            var result = SendMessage();
-
-            // ModifyHtml();
-        }
-
-        private static async Task<Message> SendMessage()
-        {
-            var bot = new Telegram.Bot.TelegramBotClient("526101740:AAGDH_XEI-2H5uRDe2hDyS_Jea9W1fThAJk");
-            return await bot.SendTextMessageAsync("395421232", "test message");
+            service.SendMessage("395421232", "test");
+            // var bot = new Telegram.Bot.TelegramBotClient("526101740:AAGDH_XEI-2H5uRDe2hDyS_Jea9W1fThAJk");
+            // return await bot.SendTextMessageAsync("395421232", "test message");
         }
 
         private static void ModifyHtml()
